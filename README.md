@@ -1,1 +1,1 @@
-# Fire-and-Smoke-Detection-WebApp
+# Fire-and-Smoke-Detection-App
