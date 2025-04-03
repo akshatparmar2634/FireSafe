@@ -1,0 +1,5 @@
+path: C:/Users/vimal/OneDrive/Documents/Uni/6th_Sem/CV/Fire-and-Smoke-Detection-WebApp/datasets
+train: images/train
+val: images/val
+nc: 3  # Number of classes (smoke, fire, person)
+names: ["smoke", "fire", "person"]
