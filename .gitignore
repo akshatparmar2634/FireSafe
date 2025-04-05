@@ -1,5 +1,9 @@
-data
-runs
-test-runs
-test-output
-datasets
+.cv_env
+test.py
+backend/__pycache__
+backend/.env
+models/data
+models/runs
+models/test-runs
+models/test-output
+models/datasets
