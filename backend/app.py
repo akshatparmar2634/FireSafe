@@ -1,138 +1,159 @@
-from flask import Flask, request
+# Flask MJPEG backend + FCM push notification on fire detection
+
+from flask import Flask, Response, request, jsonify
 from flask_cors import CORS
-from flask_migrate import Migrate  
-from models import db, User, Feed  # Your existing models
+from flask_migrate import Migrate
+from models import db, User, Feed
 from routes import init_routes
 from config import Config
-import asyncio
-import websockets
-from camera import Camera, generate_frames_base64  # Generator yielding base64 strings
 import jwt
-import threading
+import cv2
+from ultralytics import YOLO
+import logging
+import time
+import requests
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-
-# Enable CORS for development
-CORS(app, resources={
-    r"/*": {
-        "origins": ["*"],
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "*"]
-    }
-})
-
-@app.before_request
-def log_request():
-    print(f"[REQUEST DEBUG] {request.method} {request.path} Headers: {request.headers}")
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 app.config.from_object(Config)
 db.init_app(app)
 migrate = Migrate(app, db)
 init_routes(app)
 
-# WebSocket handler.
-# The Flutter client must supply the feed ID in the custom header "feed_id".
-async def video_feed_websocket(websocket, path):
-    # Retrieve feed_id from the custom header; otherwise, parse from the URL.
-    feed_id_str = websocket.request_headers.get('feed_id')
-    if not feed_id_str:
+# Replace this with your Firebase Server Key
+FCM_SERVER_KEY = "YOUR_FIREBASE_SERVER_KEY_HERE"
+
+# Notification helper
+def send_push_notification(fcm_token, title, body):
+    response = requests.post(
+        'https://fcm.googleapis.com/fcm/send',
+        headers={
+            'Authorization': f'key={FCM_SERVER_KEY}',
+            'Content-Type': 'application/json'
+        },
+        json={
+            "to": fcm_token,
+            "notification": {
+                "title": title,
+                "body": body
+            },
+            "priority": "high"
+        }
+    )
+    logger.info(f"Push notification sent: {response.status_code} - {response.text}")
+
+# YOLO + RTSP Camera Stream
+class Camera:
+    def __init__(self, rtsp_url, user):
+        self.rtsp_url = rtsp_url
+        self.model = YOLO('../yolo_models/best_nano_111.pt')
+        self.cap = cv2.VideoCapture(rtsp_url)
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        self.last_detect = 0
+        self.last_results = []
+        self.user = user
+        self.fire_notified = False
+
+    def get_annotated_frame(self):
+        success, frame = self.cap.read()
+        if not success:
+            return None
+
+        frame = cv2.resize(frame, (480, 272))
+
         try:
-            feed_id_str = path.split('/')[-1]
-        except Exception:
-            await websocket.send("Error: Feed ID not provided")
-            await websocket.close()
-            return
+            now = time.time()
+            if now - self.last_detect > 0.5:
+                self.last_detect = now
+                self.last_results = self.model(frame)
 
-    try:
-        feed_id = int(feed_id_str)
-    except ValueError:
-        await websocket.send("Error: Feed ID is not an integer")
-        await websocket.close()
-        return
+                for result in self.last_results:
+                    for box in result.boxes:
+                        cls = int(box.cls[0])
+                        label = result.names[cls]
 
-    print(f"[WS DEBUG] Feed ID extracted: {feed_id}")
+                        if label.lower() == "fire" and not self.fire_notified:
+                            self.fire_notified = True
+                            if self.user.fcm_token:
+                                send_push_notification(
+                                    self.user.fcm_token,
+                                    "🔥 Fire Alert",
+                                    f"Fire detected in feed: {self.rtsp_url}"
+                                )
 
-    # Retrieve token from the Authorization header.
-    token = websocket.request_headers.get('Authorization', '').replace('Bearer ', '')
-    print(f"[WS DEBUG] Token received: {token}")
+            for result in self.last_results:
+                for box in result.boxes:
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    conf = box.conf[0]
+                    label = f"{result.names[int(box.cls[0])]} {conf:.2f}"
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        except Exception as e:
+            logger.error(f"Detection failed: {e}")
+
+        return frame
+
+    def release(self):
+        if self.cap:
+            self.cap.release()
+
+@app.route('/save-token', methods=['POST'])
+def save_fcm_token():
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
     if not token:
-        await websocket.send("Error: No token provided")
-        await websocket.close()
-        return
+        return jsonify({"error": "Unauthorized"}), 401
 
     try:
         payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-        print(f"[WS DEBUG] JWT payload: {payload}")
-    except jwt.InvalidTokenError as e:
-        print(f"[WS DEBUG] Token decode error: {e}")
-        await websocket.send("Error: Invalid token")
-        await websocket.close()
-        return
+    except jwt.InvalidTokenError:
+        return jsonify({"error": "Invalid token"}), 403
 
-    # All db queries need an application context.
-    with app.app_context():
-        current_user = db.session.get(User, payload['user_id'])
-    print(f"[WS DEBUG] Current user: {current_user}")
-    if not current_user:
-        await websocket.send("Error: Invalid token")
-        await websocket.close()
-        return
+    user = db.session.get(User, payload['user_id'])
+    if not user:
+        return jsonify({"error": "User not found"}), 404
 
-    with app.app_context():
-        feed = Feed.query.filter_by(id=feed_id, user_id=current_user.id).first()
-    print(f"[WS DEBUG] Feed retrieved: {feed}")
-    if not feed or not feed.rtsp_url:
-        await websocket.send("Error: Feed not found or no RTSP URL configured")
-        await websocket.close()
-        return
+    fcm_token = request.form.get('fcm_token')
+    user.fcm_token = fcm_token
+    db.session.commit()
+    return jsonify({"message": "Token saved successfully"})
 
-    print(f"[WS DEBUG] Initializing camera with RTSP URL: {feed.rtsp_url}")
-    camera = Camera(feed.rtsp_url)
-    print("[WS DEBUG] Camera initialized, starting frame generation")
-    try:
-        for frame in generate_frames_base64(camera):  # frame is a base64-encoded string
-            print(f"[WS DEBUG] Sending frame (base64 length: {len(frame)} characters)")
-            await websocket.send(frame)
-            await asyncio.sleep(0.033)  # ~30 fps
-    except websockets.ConnectionClosed:
-        print(f"[WS DEBUG] WebSocket connection closed for feed {feed_id}")
-    except Exception as ex:
-        print(f"[WS DEBUG] Error during frame sending: {ex}")
-    finally:
-        camera.release()
-
-async def start_websocket_server():
-    async with websockets.serve(
-        video_feed_websocket,
-        "0.0.0.0",
-        8765
-    ):
-        print("[WS DEBUG] WebSocket server started on ws://0.0.0.0:8765")
-        await asyncio.Future()  # run forever
-
-def run_flask():
-    app.run(debug=True, host='0.0.0.0', port=5001, use_reloader=False)
-
-async def main():
-    with app.app_context():
-        print("[DB DEBUG] Creating database tables...")
-        try:
-            db.create_all()
-            print("[DB DEBUG] Tables created successfully!")
-        except Exception as e:
-            print(f"[DB DEBUG] Database error: {e}")
-            return
-
-    print("[WS DEBUG] Starting WebSocket server...")
-    websocket_task = asyncio.create_task(start_websocket_server())
-    print("[WS DEBUG] Starting Flask in a separate thread...")
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
+@app.route('/mjpeg/<int:feed_id>')
+def mjpeg_stream(feed_id):
+    token = request.args.get('token')
+    if not token:
+        return "Unauthorized", 401
 
     try:
-        await websocket_task
-    except asyncio.CancelledError:
-        print("[WS DEBUG] WebSocket server stopped")
+        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+    except jwt.InvalidTokenError:
+        return "Invalid token", 403
+
+    with app.app_context():
+        user = db.session.get(User, payload['user_id'])
+        if not user:
+            return "User not found", 404
+        feed = Feed.query.filter_by(id=feed_id, user_id=user.id).first()
+        if not feed or not feed.rtsp_url:
+            return "Feed not found", 404
+
+    camera = Camera(feed.rtsp_url, user)
+
+    def generate():
+        while True:
+            frame = camera.get_annotated_frame()
+            if frame is None:
+                continue
+            ret, jpeg = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
+            if not ret:
+                continue
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
+
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    app.run(debug=True, host='0.0.0.0', port=5001)

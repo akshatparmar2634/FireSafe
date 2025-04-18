@@ -13,6 +13,7 @@ def init_routes(app):
         print("[ROUTE DEBUG] Received signup request")
         try:
             data = request.json
+            print(data)
             if not data or 'email' not in data or 'password' not in data:
                 print("[ROUTE DEBUG] Missing email or password in signup")
                 return jsonify({'message': 'Missing email or password'}), 400

@@ -3,6 +3,10 @@
         android:label="cv_flutter"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="alert_channel"/>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -44,4 +48,6 @@
     </queries>
 
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
 </manifest>
