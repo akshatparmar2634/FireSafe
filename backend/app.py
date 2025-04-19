@@ -9,7 +9,6 @@ import cv2
 from ultralytics import YOLO
 import logging
 import time
-from utils.fcm import send_push_notification  # ✅ Use HTTP v1 version here
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
@@ -24,7 +23,7 @@ db.init_app(app)
 migrate = Migrate(app, db)
 init_routes(app)
 
-# 🔥 YOLO + RTSP Camera Stream
+# YOLO + RTSP Camera Stream
 class Camera:
     def __init__(self, rtsp_url, user):
         self.rtsp_url = rtsp_url
@@ -34,7 +33,6 @@ class Camera:
         self.last_detect = 0
         self.last_results = []
         self.user = user
-        self.fire_notified = False
 
     def get_annotated_frame(self):
         success, frame = self.cap.read()
@@ -45,35 +43,30 @@ class Camera:
 
         try:
             now = time.time()
-            if now - self.last_detect > 2:
+            if now - self.last_detect > 0.08:
                 self.last_detect = now
                 self.last_results = self.model(frame)
+                
 
                 for result in self.last_results:
                     for box in result.boxes:
-                        cls = int(box.cls[0])
-                        label = result.names[cls]
-                        print(f"this is {label}")
-
-                        if label.lower() == "fire":
-                            print("🔥 FIRE DETECTED!")
-                            self.fire_notified = True
-                            if self.user.fcm_token:
-                                send_push_notification(
-                                    self.user.fcm_token,
-                                    "🔥 Fire Alert",
-                                    f"Fire detected in feed: {self.rtsp_url}"
-                                )
-                                print("Push notification sent to user.")
+                        if box.conf[0] > 0.6:
+                            cls = int(box.cls[0])
+                            label = result.names[cls]
+                            # print(f"Detected: {label}")
 
             for result in self.last_results:
                 for box in result.boxes:
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    conf = box.conf[0]
-                    label = f"{result.names[int(box.cls[0])]} {conf:.2f}"
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    cv2.putText(frame, label, (x1, y1 - 10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                    if box.conf[0] > 0.6:
+                        x1, y1, x2, y2 = map(int, box.xyxy[0])
+                        conf = box.conf[0]
+                        label = f"{result.names[int(box.cls[0])]} {conf:.2f}"
+                        print(f"printing: {label}")
+                        if label.lower().startswith("fire"):
+                            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                            cv2.putText(frame, label, (x1, y1 - 10),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                        
         except Exception as e:
             logger.error(f"Detection failed: {e}")
 
@@ -83,7 +76,7 @@ class Camera:
         if self.cap:
             self.cap.release()
 
-# ✅ Token saving route (from Flutter HomePage)
+# Token saving route (from Flutter HomePage)
 @app.route('/api/register_fcm', methods=['POST'])
 def save_fcm_token():
     token = request.headers.get('Authorization', '').replace('Bearer ', '')
