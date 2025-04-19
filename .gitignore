@@ -1,5 +1,6 @@
 .cv_env
 test.py
+CCTV_interface.py
 backend/__pycache__
 backend/.env
 models/data
@@ -7,6 +8,7 @@ models/runs
 models/test-runs
 models/test-output
 models/datasets
+backend/firebase-key.json
 data/
 datasets/
 models/

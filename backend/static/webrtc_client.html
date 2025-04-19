@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebRTC CCTV Stream</title>
+    <style>
+        video { width: 100%; max-width: 640px; }
+    </style>
+</head>
+<body>
+    <video id="video" autoplay playsinline></video>
+    <script>
+        const ws = new WebSocket('ws://[YOUR_SERVER_IP]:5000/feeds/[FEED_ID]/webrtc');
+        const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+        const pc = new RTCPeerConnection(configuration);
+
+        pc.ontrack = (event) => {
+            const video = document.getElementById('video');
+            video.srcObject = event.streams[0];
+        };
+
+        pc.onicecandidate = (event) => {
+            if (event.candidate) {
+                ws.send(JSON.stringify({ candidate: event.candidate }));
+            }
+        };
+
+        ws.onmessage = async (event) => {
+            const data = JSON.parse(event.data);
+            if (data.error) {
+                console.error(data.error);
+                return;
+            }
+            if (data.type === 'offer') {
+                await pc.setRemoteDescription(new RTCSessionDescription(data));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                ws.send(JSON.stringify({ sdp: answer.sdp, type: answer.type }));
+            } else if (data.candidate) {
+                await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+            }
+        };
+    </script>
+</body>
+</html>

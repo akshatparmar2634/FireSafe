@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "856778886642",
+    "project_id": "firedetectionapp-8e16b",
+    "storage_bucket": "firedetectionapp-8e16b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:856778886642:android:7a2e880849a93bbe7c6f6b",
+        "android_client_info": {
+          "package_name": "com.example.cv_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB5CjOqWp499_RSkGz52WRUdH3FbpPtIYE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
