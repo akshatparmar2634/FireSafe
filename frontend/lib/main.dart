@@ -9,20 +9,43 @@ import 'pages/home.dart';
 import 'pages/add_feed.dart';
 import 'pages/feed_detail.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+/// ✅ Background handler for terminated/background state
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  print("📨 Handling background message...");
   await Firebase.initializeApp();
   await NotificationService.initialize();
 
-  // ✅ Listen to foreground messages
+  if (message.notification != null) {
+    NotificationService.showNotification(
+      message.notification!.title ?? '🔥 Fire Alert',
+      message.notification!.body ?? 'Smoke or fire detected!',
+    );
+    print("🔥 Background message received: \${message.notification?.title}");
+  }
+}
+
+void main() async {
+  print("🚀 App starting...");
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  print("✅ Firebase initialized");
+  await NotificationService.initialize();
+  print("🔔 Notification service initialized");
+
+  // ✅ Now it's safe to request permission
+  await FirebaseMessaging.instance.requestPermission();
+
+  // ✅ Listen for background messages
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  // ✅ Listen for foreground messages
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     if (message.notification != null) {
       NotificationService.showNotification(
-        message.notification!.title ?? 'Fire Alert',
+        message.notification!.title ?? '🔥 Fire Alert',
         message.notification!.body ?? 'Smoke or fire detected!',
       );
-      print("🔥 Foreground message received: ${message.notification?.title}");
-
+      print("🔥 Foreground message received: \${message.notification?.title}");
     }
   });
 
@@ -32,6 +55,7 @@ void main() async {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    print("🏁 Building MyApp widget");
     return MaterialApp(
       title: 'FireSafe',
       theme: ThemeData(

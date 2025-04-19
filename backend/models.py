@@ -8,6 +8,8 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
     feeds = db.relationship('Feed', backref='owner', lazy=True)
+    fcm_token = db.Column(db.String(512), nullable=True)
+
 
 class Feed(db.Model):
     id = db.Column(db.Integer, primary_key=True)

@@ -38,7 +38,7 @@ class _SignupPageState extends State<SignupPage> with SingleTickerProviderStateM
   Future<void> _signup() async {
     setState(() => _isLoading = true);
 
-    final url = Uri.parse('http://10.0.2.2:5001/signup'); // Emulator-safe URL
+    final url = Uri.parse('http://192.168.137.170:5001/signup'); // Emulator-safe URL
 
     try {
       final response = await http.post(

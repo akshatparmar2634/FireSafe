@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/notification_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -35,7 +36,7 @@ class _HomePageState extends State<HomePage> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:5001/feeds'),
+        Uri.parse('http://192.168.137.170:5001/feeds'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -73,7 +74,6 @@ class _HomePageState extends State<HomePage> {
             ? const Center(child: CircularProgressIndicator())
             : Column(
                 children: [
-                  // Header
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16.0),
                     child: Text(
@@ -81,7 +81,6 @@ class _HomePageState extends State<HomePage> {
                       style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blue[800]),
                     ),
                   ),
-                  // Feed List
                   Expanded(
                     child: feeds.isEmpty
                         ? const Center(child: Text('No feeds found. Add one!'))
@@ -127,7 +126,7 @@ class _HomePageState extends State<HomePage> {
                                     Navigator.pushNamed(
                                       context,
                                       '/feed-detail',
-                                      arguments: feed, // Pass feed directly, not as a list
+                                      arguments: feed,
                                     );
                                   },
                                 ),
@@ -135,23 +134,36 @@ class _HomePageState extends State<HomePage> {
                             },
                           ),
                   ),
-                  // Add Feed Button
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-                        final result = await Navigator.pushNamed(context, '/add-feed');
-                        if (result == true) {
-                          fetchFeeds(); // Refresh when feed added
-                        }
-                      },
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add New Feed'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                        backgroundColor: Colors.blue[800],
-                        foregroundColor: Colors.white,
-                      ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      NotificationService.showNotification(
+                        "🔥 Test Alert",
+                        "This is a manual test of fire alarm system.",
+                      );
+                    },
+                    icon: const Icon(Icons.notifications_active),
+                    label: const Text("Test Alarm"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red[800],
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      final result = await Navigator.pushNamed(context, '/add-feed');
+                      if (result == true) {
+                        fetchFeeds(); // Refresh when feed added
+                      }
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add New Feed'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                      backgroundColor: Colors.blue[800],
+                      foregroundColor: Colors.white,
                     ),
                   ),
                 ],

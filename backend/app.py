@@ -1,5 +1,3 @@
-# Flask MJPEG backend + FCM push notification on fire detection
-
 from flask import Flask, Response, request, jsonify
 from flask_cors import CORS
 from flask_migrate import Migrate
@@ -11,42 +9,22 @@ import cv2
 from ultralytics import YOLO
 import logging
 import time
-import requests
+from utils.fcm import send_push_notification  # ✅ Use HTTP v1 version here
 
+# Logging setup
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Flask App Setup
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
-
 app.config.from_object(Config)
+
 db.init_app(app)
 migrate = Migrate(app, db)
 init_routes(app)
 
-# Replace this with your Firebase Server Key
-FCM_SERVER_KEY = "YOUR_FIREBASE_SERVER_KEY_HERE"
-
-# Notification helper
-def send_push_notification(fcm_token, title, body):
-    response = requests.post(
-        'https://fcm.googleapis.com/fcm/send',
-        headers={
-            'Authorization': f'key={FCM_SERVER_KEY}',
-            'Content-Type': 'application/json'
-        },
-        json={
-            "to": fcm_token,
-            "notification": {
-                "title": title,
-                "body": body
-            },
-            "priority": "high"
-        }
-    )
-    logger.info(f"Push notification sent: {response.status_code} - {response.text}")
-
-# YOLO + RTSP Camera Stream
+# 🔥 YOLO + RTSP Camera Stream
 class Camera:
     def __init__(self, rtsp_url, user):
         self.rtsp_url = rtsp_url
@@ -67,7 +45,7 @@ class Camera:
 
         try:
             now = time.time()
-            if now - self.last_detect > 0.5:
+            if now - self.last_detect > 2:
                 self.last_detect = now
                 self.last_results = self.model(frame)
 
@@ -75,8 +53,10 @@ class Camera:
                     for box in result.boxes:
                         cls = int(box.cls[0])
                         label = result.names[cls]
+                        print(f"this is {label}")
 
-                        if label.lower() == "fire" and not self.fire_notified:
+                        if label.lower() == "fire":
+                            print("🔥 FIRE DETECTED!")
                             self.fire_notified = True
                             if self.user.fcm_token:
                                 send_push_notification(
@@ -84,6 +64,7 @@ class Camera:
                                     "🔥 Fire Alert",
                                     f"Fire detected in feed: {self.rtsp_url}"
                                 )
+                                print("Push notification sent to user.")
 
             for result in self.last_results:
                 for box in result.boxes:
@@ -91,7 +72,8 @@ class Camera:
                     conf = box.conf[0]
                     label = f"{result.names[int(box.cls[0])]} {conf:.2f}"
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                    cv2.putText(frame, label, (x1, y1 - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         except Exception as e:
             logger.error(f"Detection failed: {e}")
 
@@ -101,7 +83,8 @@ class Camera:
         if self.cap:
             self.cap.release()
 
-@app.route('/save-token', methods=['POST'])
+# ✅ Token saving route (from Flutter HomePage)
+@app.route('/api/register_fcm', methods=['POST'])
 def save_fcm_token():
     token = request.headers.get('Authorization', '').replace('Bearer ', '')
     if not token:
@@ -116,10 +99,15 @@ def save_fcm_token():
     if not user:
         return jsonify({"error": "User not found"}), 404
 
-    fcm_token = request.form.get('fcm_token')
+    data = request.get_json()
+    fcm_token = data.get('fcmToken')
+
+    if not fcm_token:
+        return jsonify({"error": "FCM token missing"}), 400
+
     user.fcm_token = fcm_token
     db.session.commit()
-    return jsonify({"message": "Token saved successfully"})
+    return jsonify({"message": "Token saved successfully"}), 200
 
 @app.route('/mjpeg/<int:feed_id>')
 def mjpeg_stream(feed_id):

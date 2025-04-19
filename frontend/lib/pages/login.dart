@@ -16,8 +16,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   bool _isLoading = false;
   String? _errorMessage;
 
-  final String baseUrl = 'http://10.0.2.2:5001'; // Emulator
-  // final String baseUrl = 'http://192.168.x.x:5000'; // Physical device
+  // final String baseUrl = 'http://10.0.2.2:5001'; // Emulator
+  final String baseUrl = 'http://192.168.137.170:5001'; // Physical device
 
   @override
   void initState() {
@@ -52,7 +52,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         Uri.parse('$baseUrl/login'),
         headers: {
           'Content-Type': 'application/json',
-          'Origin': 'http://10.0.2.2',  // Explicitly set for emulator
+          // 'Origin': 'http://10.0.2.2',  // Explicitly set for emulator
         },
         body: jsonEncode({
           'email': _emailController.text,
