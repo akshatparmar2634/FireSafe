@@ -7,3 +7,9 @@ models/runs
 models/test-runs
 models/test-output
 models/datasets
+data/
+datasets/
+models/
+runs/
+test-output/
+test-runs/
