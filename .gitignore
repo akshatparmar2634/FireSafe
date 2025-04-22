@@ -12,3 +12,4 @@ runs/
 test-output/
 test-runs/
 merged_dataset/
+.vscode

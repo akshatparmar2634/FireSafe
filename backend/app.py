@@ -9,6 +9,7 @@ import cv2
 from ultralytics import YOLO
 import logging
 import time
+import torch
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
@@ -27,7 +28,10 @@ init_routes(app)
 class Camera:
     def __init__(self, rtsp_url, user):
         self.rtsp_url = rtsp_url
-        self.model = YOLO('../yolo_models/best_nano_111.pt')
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        logger.info(f"Using device: {self.device}")
+        self.model = YOLO('../detection_models/yolo_models/baseline_11_both.pt')
+        self.model.to(self.device)
         self.cap = cv2.VideoCapture(rtsp_url)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self.last_detect = 0
@@ -39,21 +43,20 @@ class Camera:
         if not success:
             return None
 
-        frame = cv2.resize(frame, (480, 272))
+        # frame = cv2.resize(frame, (480, 272))
 
         try:
             now = time.time()
-            if now - self.last_detect > 0.08:
-                self.last_detect = now
-                self.last_results = self.model(frame)
+            self.last_detect = now
+            self.last_results = self.model(frame)
                 
 
-                for result in self.last_results:
-                    for box in result.boxes:
-                        if box.conf[0] > 0.6:
-                            cls = int(box.cls[0])
-                            label = result.names[cls]
-                            # print(f"Detected: {label}")
+            for result in self.last_results:
+                for box in result.boxes:
+                    if box.conf[0] > 0.6:
+                        cls = int(box.cls[0])
+                        label = result.names[cls]
+                        # print(f"Detected: {label}")
 
             for result in self.last_results:
                 for box in result.boxes:
@@ -62,7 +65,7 @@ class Camera:
                         conf = box.conf[0]
                         label = f"{result.names[int(box.cls[0])]} {conf:.2f}"
                         print(f"printing: {label}")
-                        if label.lower().startswith("fire"):
+                        if label.lower().startswith("fire") or label.lower().startswith("person"):
                             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                             cv2.putText(frame, label, (x1, y1 - 10),
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
