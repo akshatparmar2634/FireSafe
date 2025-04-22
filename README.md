@@ -10,7 +10,7 @@
 
 ### 📱 Demo
 
-<video src="demo/Mobile_App_Demo.mp4" controls width="600"></video>
+[▶️ Click here to watch the Mobile App Demo](demo/Mobile_App_Demo.mp4)
 
 ## Features
 
