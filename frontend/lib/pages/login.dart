@@ -17,7 +17,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   String? _errorMessage;
 
   // final String baseUrl = 'http://10.0.2.2:5001'; // Emulator
-  final String baseUrl = 'http://192.168.137.170:5001'; // Physical device
+  final String baseUrl = 'http://192.168.242.195:5001'; // Physical device
 
   @override
   void initState() {

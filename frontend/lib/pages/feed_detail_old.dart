@@ -48,7 +48,7 @@ class _FeedDetailPageState extends State<FeedDetailPage> {
     }
 
     final feedId = _feed!['id'].toString();
-    final uri = Uri.parse('http://192.168.137.170:5001/mjpeg/$feedId?token=$token');
+    final uri = Uri.parse('http://192.168.242.195:5001/mjpeg/$feedId?token=$token');
 
     setState(() {
       _streamUrl = uri.toString();

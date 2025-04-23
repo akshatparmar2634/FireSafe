@@ -32,6 +32,7 @@ class Camera:
         logger.info(f"Using device: {self.device}")
         self.model = YOLO('../detection_models/yolo_models/baseline_11_both.pt')
         self.model.to(self.device)
+        logger.info(f"Using device: {self.device}")
         self.cap = cv2.VideoCapture(rtsp_url)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self.last_detect = 0

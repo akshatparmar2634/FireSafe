@@ -34,7 +34,7 @@ class _AddFeedPageState extends State<AddFeedPage> {
     }
 
     final response = await http.post(
-      Uri.parse('http://192.168.137.170:5001/feeds'), // Updated endpoint to match backend
+      Uri.parse('http://192.168.242.195:5001/feeds'), // Updated endpoint to match backend
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',

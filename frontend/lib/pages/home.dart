@@ -36,7 +36,7 @@ class _HomePageState extends State<HomePage> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.137.170:5001/feeds'),
+        Uri.parse('http://192.168.242.195:5001/feeds'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -134,22 +134,24 @@ class _HomePageState extends State<HomePage> {
                             },
                           ),
                   ),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      NotificationService.showNotification(
-                        "🔥 Test Alert",
-                        "This is a manual test of fire alarm system.",
-                      );
-                    },
-                    icon: const Icon(Icons.notifications_active),
-                    label: const Text("Test Alarm"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red[800],
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  if (feeds.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        final result = await Navigator.pushNamed(context, '/notifications');
+                        if (result == true) {
+                          fetchFeeds(); // Refresh when notification is acknowledged
+                        }
+                      },
+                      icon: const Icon(Icons.notifications),
+                      label: const Text('View Notifications'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                        backgroundColor: Colors.blue[800],
+                        foregroundColor: Colors.white,
+                      ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
                     onPressed: () async {
