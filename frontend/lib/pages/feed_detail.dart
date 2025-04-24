@@ -1,12 +1,12 @@
-// Complete Flutter frontend with MJPEG stream + Firebase FCM registration
 
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_mjpeg/flutter_mjpeg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:http/http.dart' as http;
-import 'dart:io';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,7 +21,11 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Fire Detection Stream',
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: const FeedDetailPage(),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const Placeholder(), // Replace with your home page
+        '/feed-detail': (context) => const FeedDetailPage(),
+      },
     );
   }
 }
@@ -34,25 +38,31 @@ class FeedDetailPage extends StatefulWidget {
 }
 
 class _FeedDetailPageState extends State<FeedDetailPage> {
+  Map<String, dynamic>? _feed;
   String? _streamUrl;
   String? _errorMessage;
   bool _isLoading = true;
-  Map<String, dynamic>? _feed = {
-    'id': 3,
-    'name': 'Test Feed',
-    'location': 'Office',
-    'status': 'Online',
-  };
 
   @override
   void initState() {
     super.initState();
-    _initializeMessaging();
+    _initialize();
   }
 
-  Future<void> _initializeMessaging() async {
+  Future<void> _initialize() async {
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    if (args == null || args['id'] == null) {
+      setState(() {
+        _errorMessage = 'Feed ID not provided';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    final feedId = args['id'].toString();
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
+
     if (token == null) {
       setState(() {
         _errorMessage = 'User token not found';
@@ -61,6 +71,37 @@ class _FeedDetailPageState extends State<FeedDetailPage> {
       return;
     }
 
+    await _fetchFeed(token, feedId);
+    await _registerFcmToken(token);
+    _startMjpegStream(token, feedId);
+  }
+
+  Future<void> _fetchFeed(String token, String feedId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://192.168.45.195:5001/feeds/$feedId'),
+        headers: {
+          HttpHeaders.authorizationHeader: 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _feed = json.decode(response.body);
+        });
+      } else {
+        setState(() {
+          _errorMessage = 'Failed to load feed details: ${response.body}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error loading feed details: $e';
+      });
+    }
+  }
+
+  Future<void> _registerFcmToken(String token) async {
     final fcmToken = await FirebaseMessaging.instance.getToken();
     if (fcmToken != null) {
       await http.post(
@@ -69,16 +110,12 @@ class _FeedDetailPageState extends State<FeedDetailPage> {
           HttpHeaders.authorizationHeader: 'Bearer $token',
           HttpHeaders.contentTypeHeader: 'application/json',
         },
-        body: '{"fcmToken": "$fcmToken"}',
+        body: jsonEncode({'fcmToken': fcmToken}),
       );
-
     }
-
-    _startMjpegStream(token);
   }
 
-  void _startMjpegStream(String token) {
-    final feedId = _feed!['id'].toString();
+  void _startMjpegStream(String token, String feedId) {
     final uri = Uri.parse('http://192.168.45.195:5001/mjpeg/$feedId?token=$token');
     setState(() {
       _streamUrl = uri.toString();
@@ -135,3 +172,4 @@ class _FeedDetailPageState extends State<FeedDetailPage> {
     );
   }
 }
+
