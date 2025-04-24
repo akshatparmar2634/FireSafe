@@ -81,7 +81,7 @@ class Camera:
             self.cap.release()
 
 # Token saving route (from Flutter HomePage)
-@app.route('/api/register_fcm', methods=['POST'])
+@app.route('/save-token', methods=['POST'])
 def save_fcm_token():
     token = request.headers.get('Authorization', '').replace('Bearer ', '')
     if not token:

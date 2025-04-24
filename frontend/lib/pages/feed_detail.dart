@@ -67,11 +67,11 @@ class _FeedDetailPageState extends State<FeedDetailPage> {
         Uri.parse('http://192.168.242.195:5001/save-token'),
         headers: {
           HttpHeaders.authorizationHeader: 'Bearer $token',
+          HttpHeaders.contentTypeHeader: 'application/json',
         },
-        body: {
-          'fcm_token': fcmToken,
-        },
+        body: '{"fcmToken": "$fcmToken"}',
       );
+
     }
 
     _startMjpegStream(token);
