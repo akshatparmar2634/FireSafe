@@ -36,7 +36,7 @@ class _HomePageState extends State<HomePage> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.242.195:5001/feeds'),
+        Uri.parse('http://192.168.45.195:5001/feeds'),
         headers: {'Authorization': 'Bearer $token'},
       );
 

@@ -64,7 +64,7 @@ class _FeedDetailPageState extends State<FeedDetailPage> {
     final fcmToken = await FirebaseMessaging.instance.getToken();
     if (fcmToken != null) {
       await http.post(
-        Uri.parse('http://192.168.242.195:5001/save-token'),
+        Uri.parse('http://192.168.45.195:5001/save-token'),
         headers: {
           HttpHeaders.authorizationHeader: 'Bearer $token',
           HttpHeaders.contentTypeHeader: 'application/json',
@@ -79,7 +79,7 @@ class _FeedDetailPageState extends State<FeedDetailPage> {
 
   void _startMjpegStream(String token) {
     final feedId = _feed!['id'].toString();
-    final uri = Uri.parse('http://192.168.242.195:5001/mjpeg/$feedId?token=$token');
+    final uri = Uri.parse('http://192.168.45.195:5001/mjpeg/$feedId?token=$token');
     setState(() {
       _streamUrl = uri.toString();
       _isLoading = false;
